@@ -88,10 +88,10 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
         else:
 
             BTNS = [
-                [InlineKeyboardButton(text='480ᴘ', callback_data='480pc'), InlineKeyboardButton(
-                    text='720ᴘ', callback_data='720pc')],
-                [InlineKeyboardButton(text='1080ᴘ', callback_data='1080pc'), InlineKeyboardButton(
-                    text='4ᴋ', callback_data='2160pc')],
+                [InlineKeyboardButton(text='𝟯𝟲𝟬𝗽', callback_data='360pc'), InlineKeyboardButton(
+                    text='𝟰𝟴𝟬𝗽', callback_data='480pc')],
+                [InlineKeyboardButton(text='𝟳𝟮𝟬𝗽', callback_data='720pc'), InlineKeyboardButton(
+                    text='𝟭𝟬𝟴𝟬𝗽', callback_data='1080pc')],
                 [InlineKeyboardButton(
                     text='Cᴜsᴛᴏᴍ Eɴᴄᴏᴅɪɴɢ 🗜️', callback_data='custompc')],
                 [InlineKeyboardButton(text='✘ Cʟᴏꜱᴇ', callback_data='close'), InlineKeyboardButton(
@@ -99,19 +99,29 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
             ]
             await query.message.edit(text='**Select the Compression Method Below 👇 **', reply_markup=InlineKeyboardMarkup(BTNS))
 
+    elif data == '360pc':
+        try:
+            c_thumb = await db.get_thumbnail(query.from_user.id)
+            ffmpeg = ""
+            await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
+
+        except Exception as e:
+            print(e)
+
     elif data == '480pc':
         try:
             c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = "-preset veryfast -c:v libx264 -s 840x480 -x265-params 'bframes=8:psy-rd=1:ref=3:aq-mode=3:aq-strength=0.8:deblock=1,1' -pix_fmt yuv420p -crf 30 -c:a libopus -b:a 32k -c:s copy -map 0 -ac 2 -ab 32k -vbr 2 -level 3.1 -threads 5"
+            ffmpeg = ""
             await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
 
         except Exception as e:
             print(e)
 
     elif data == '720pc':
+
         try:
             c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = "-preset veryfast -c:v libx264 -s 1280x720 -x265-params 'bframes=8:psy-rd=1:ref=3:aq-mode=3:aq-strength=0.8:deblock=1,1' -pix_fmt yuv420p -crf 30 -c:a libopus -b:a 32k -c:s copy -map 0 -ac 2 -ab 32k -vbr 2 -level 3.1 -threads 5"
+            ffmpeg = ""
             await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
 
         except Exception as e:
@@ -121,17 +131,7 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
 
         try:
             c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = "-preset veryfast -c:v libx264 -s 1920x1080 -x265-params 'bframes=8:psy-rd=1:ref=3:aq-mode=3:aq-strength=0.8:deblock=1,1' -pix_fmt yuv420p -crf 30 -c:a libopus -b:a 32k -c:s copy -map 0 -ac 2 -ab 32k -vbr 2 -level 3.1 -threads 5"
-            await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
-
-        except Exception as e:
-            print(e)
-
-    elif data == '2160pc':
-
-        try:
-            c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = "-preset veryfast -c:v libx264 -s 3840x2160 -x265-params 'bframes=8:psy-rd=1:ref=3:aq-mode=3:aq-strength=0.8:deblock=1,1' -pix_fmt yuv420p -crf 30 -c:a libopus -b:a 32k -c:s copy -map 0 -ac 2 -ab 32k -vbr 2 -level 3.1 -threads 5"
+            ffmpeg = ""
             await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
 
         except Exception as e:
