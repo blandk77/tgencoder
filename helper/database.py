@@ -56,6 +56,13 @@ class Database:
     async def get_metadata(self, id):
         user = await self.col.find_one({'id': int(id)})
         return user.get('metadata', None)
+        
+    async def set_watermark(self, user_id, watermark):
+        await self.col.update_one({'id': int(user_id)}, {'$set': {'watermark': watermark}})
+
+    async def get_watermark(self, id):
+        user = await self.col.find_one({'id': int(id)})
+        return user.get('watermark', None)        
 
     async def add_user(self, b, m):
         u = m.from_user
