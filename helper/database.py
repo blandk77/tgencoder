@@ -1,7 +1,6 @@
 import datetime
 import motor.motor_asyncio
 from config import Config
-from helper.utils import send_log
 
 class Database:
 
