@@ -14,7 +14,7 @@ from config import Config
 from script import Txt
 from pyrogram import enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
-from helper.database import db  # Import the database module
+from helper.database import Database
 
 QUEUE = []
 
