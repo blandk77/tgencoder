@@ -103,7 +103,7 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
     elif data == '360pc':
         try:
             c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = ""
+            ffmpeg = "-map 0 -c:v libx265 -crf 30 -c:s copy -pix_fmt yuv420p -s 640x360 -b:v 150k -c:a libopus -b:a 35k -preset veryfast"
             await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
 
         except Exception as e:
@@ -112,7 +112,7 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
     elif data == '480pc':
         try:
             c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = ""
+            ffmpeg = "-map 0 -c:v libx265 -crf 28 -c:s copy -pix_fmt yuv420p -s 840x480 -b:v 150k -c:a libopus -b:a 35k -preset veryfast"
             await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
 
         except Exception as e:
@@ -122,7 +122,7 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
 
         try:
             c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = ""
+            ffmpeg = "-map 0 -c:v libx265 -crf 26 -c:s copy -pix_fmt yuv420p -s 1280x720 -b:v 150k -c:a libopus -b:a 35k -preset veryfast"
             await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
 
         except Exception as e:
@@ -132,7 +132,7 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
 
         try:
             c_thumb = await db.get_thumbnail(query.from_user.id)
-            ffmpeg = ""
+            ffmpeg = "-map 0 -c:v libx264 -crf 25 -c:s copy -pix_fmt yuv420p -s 1920x1080 -b:v 150k -c:a libopus -b:a 35k -preset veryfast"
             await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
 
         except Exception as e:
