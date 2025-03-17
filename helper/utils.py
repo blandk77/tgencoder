@@ -262,8 +262,8 @@ async def CompressVideo(bot, query, ffmpegcode, c_thumb):
         else:
             final_ffmpeg_code = ffmpegcode  # No watermark
 
-        cmd = f"ffmpeg -i '{dl}' {final_ffmpeg_code} '{Output_Path}' -y"
-
+        cmd = """ffmpeg -i "{}" {} "{}" -y""".format(dl, final_ffmpeg_code, Output_Path)
+            
         process = await asyncio.create_subprocess_shell(
             cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
