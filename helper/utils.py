@@ -14,7 +14,7 @@ from config import Config
 from script import Txt
 from pyrogram import enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
-from helper.database import Database
+from helper.database import db  # Import the database module
 
 QUEUE = []
 
@@ -262,8 +262,8 @@ async def CompressVideo(bot, query, ffmpegcode, c_thumb):
         else:
             final_ffmpeg_code = ffmpegcode  # No watermark
 
-        cmd = """ffmpeg -i "{}" {} "{}" -y""".format(dl, final_ffmpeg_code, Output_Path)
-            
+        cmd = f"""ffmpeg -i "{dl}" {final_ffmpeg_code} "{Output_Path}" -y"""
+
         process = await asyncio.create_subprocess_shell(
             cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
