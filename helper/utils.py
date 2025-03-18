@@ -15,8 +15,10 @@ from script import Txt
 from pyrogram import enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 
-# Dictionary to store queues for each user
-USER_QUEUES = {}
+
+QUEUE = []
+
+
 
 async def progress_for_pyrogram(current, total, ud_type, message, start):
     now = time.time()
@@ -129,7 +131,7 @@ async def CANT_CONFIG_GROUP_MSG(client, message):
     btn = [
         [InlineKeyboardButton(text='Bᴏᴛ Pᴍ', url=f'https://t.me/{botusername.username}')]
     ]
-    ms = await message.reply_text(text="Sᴏʀʀʏ Yᴏᴜ Cᴀɴ'ᴛ Cᴏɴғɪɢ Yᴏᴜʀ Sᴇᴛᴛɪɴɢs\n\nFɪʀsᴛ sᴛᴀʀᴛ ᴍᴇ ɪɴ ᴘʀɪᴠᴀᴛᴇ ᴛʜᴇɴ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ ᴍʏ ғᴇᴀᴛᴜʀs ɪɴ ɢʀᴏᴜᴘ", reply_to_message_id = message.id, reply_markup=InlineKeyboardMarkup(btn))
+    ms = await message.reply_text(text="Sᴏʀʀʏ Yᴏᴜ Cᴀɴ'ᴛ Cᴏɴғɪɢ Yᴏᴜʀ Sᴇᴛᴛɪɴɢs\n\nFɪʀsᴛ sᴛᴀʀᴛ ᴍᴇ ɪɴ ᴘʀɪᴠᴀᴛᴇ ᴛʜᴇɴ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ ᴍʏ ғᴇᴀᴛᴜᴇʀs ɪɴ ɢʀᴏᴜᴘ", reply_to_message_id = message.id, reply_markup=InlineKeyboardMarkup(btn))
 
     await asyncio.sleep(10)
     await ms.delete()
@@ -182,65 +184,21 @@ async def skip(e, userid):
 async def CompressVideo(bot, query, ffmpegcode, c_thumb):
     UID = query.from_user.id
     ms = await query.message.edit('Pʟᴇᴀsᴇ Wᴀɪᴛ...\n\n**Fᴇᴛᴄʜɪɴɢ Qᴜᴇᴜᴇ 👥**')
+    
 
-    # Create user queue if it doesn't exist
-    if UID not in USER_QUEUES:
-        USER_QUEUES[UID] = []
-
-    #Gather video details for the queue
-    media = query.message.reply_to_message
-    file = getattr(media , media.media.value)
-    filename = Filename(filename=str(file.file_name), mime_type=str(file.mime_type))
-    Download_DIR = f"ffmpeg/{UID}"
-    Output_DIR = f"encode/{UID}"
-    File_Path = f"ffmpeg/{UID}/{filename}"
-    Output_Path = f"encode/{UID}/{filename}"
-
-    video_data = {
-        'bot': bot,
-        'query': query,
-        'ffmpegcode': ffmpegcode,
-        'c_thumb': c_thumb,
-        'filename': filename,
-        'Download_DIR': Download_DIR,
-        'Output_DIR': Output_DIR,
-        'File_Path': File_Path,
-        'Output_Path': Output_Path,
-        'ms': ms  # Store the message object for updates
-    }
-
-
-    # Check if a process is already running for this user
     if os.path.isdir(f'ffmpeg/{UID}') and os.path.isdir(f'encode/{UID}'):
-        # Add the video to the queue
-        USER_QUEUES[UID].append(video_data)
-        await ms.edit("Added to queue.  You'll be notified when processing starts.")
-    else:
-        #Start processing immediately
-        await process_video(video_data)
-
-
-#This is a dummy function for sending message to user.
-async def send_message(chat_id, text, reply_markup=None):
-    try:
-        await bot.send_message(chat_id, text, reply_markup=reply_markup)
-    except Exception as e:
-        print(f"Failed to send message: {e}")
-
-async def process_video(video_data):
-    bot = video_data['bot']
-    query = video_data['query']
-    ffmpegcode = video_data['ffmpegcode']
-    c_thumb = video_data['c_thumb']
-    filename = video_data['filename']
-    Download_DIR = video_data['Download_DIR']
-    Output_DIR = video_data['Output_DIR']
-    File_Path = video_data['File_Path']
-    Output_Path = video_data['Output_Path']
-    UID = query.from_user.id
-    ms = video_data['ms']
+        return await ms.edit("**⚠️ Yᴏᴜ ᴄᴀɴ ᴄᴏᴍᴘʀᴇss ᴏɴʟʏ ᴏɴᴇ ғɪʟᴇ ᴀᴛ ᴀ ᴛɪᴍᴇ\n\nAs ᴛʜɪs ʜᴇʟᴘs ʀᴇᴅᴜᴄᴇ sᴇʀᴠᴇʀ ʟᴏᴀᴅ.**")
 
     try:
+        media = query.message.reply_to_message
+        file = getattr(media , media.media.value)
+        filename = Filename(filename=str(file.file_name), mime_type=str(file.mime_type))
+        Download_DIR = f"ffmpeg/{UID}"
+        Output_DIR = f"encode/{UID}"
+        File_Path = f"ffmpeg/{UID}/{filename}"
+        Output_Path = f"encode/{UID}/{filename}"
+        
+        
         await ms.edit('⚠️__**Please wait...**__\n**Tʀyɪɴɢ Tᴏ Dᴏᴡɴʟᴏᴀᴅɪɴɢ....**')
         s = dt.now()
         try:
@@ -249,7 +207,7 @@ async def process_video(video_data):
                 os.makedirs(Output_DIR)
 
                 dl = await bot.download_media(
-                    message=query.message.reply_to_message, #Used video_data['query'] before
+                    message=file,
                     file_name=File_Path,
                     progress=progress_for_pyrogram,
                     progress_args=("\n⚠️__**Please wait...**__\n\n☃️ **Dᴏᴡɴʟᴏᴀᴅ Sᴛᴀʀᴛᴇᴅ....**", ms, time.time())
@@ -292,11 +250,11 @@ async def process_video(video_data):
         # Now Uploading to the User
         ees = dt.now()
         
-        if (query.message.reply_to_message.thumbs or c_thumb): #Used video_data['query'] before
+        if (file.thumbs or c_thumb):
             if c_thumb:
                 ph_path = await bot.download_media(c_thumb)
             else:
-                ph_path = await bot.download_media(query.message.reply_to_message.thumbs[0].file_id) #Used video_data['query'] before
+                ph_path = await bot.download_media(file.thumbs[0].file_id)
 
         org = int(Path(File_Path).stat().st_size)
         com = int((Path(Output_Path).stat().st_size))
@@ -315,37 +273,21 @@ async def process_video(video_data):
                 progress=progress_for_pyrogram,
                 progress_args=("⚠️__**Please wait...**__\n🌨️ **Uᴩʟᴏᴅ Sᴛᴀʀᴛᴇᴅ....**", ms, time.time()))
         
-        if query.message.chat.type == enums.ChatType.SUPERGROUP: #Used video_data['query'] before
+        if query.message.chat.type == enums.ChatType.SUPERGROUP:
             botusername = await bot.get_me()
             await ms.edit(f"Hey {query.from_user.mention},\n\nI Have Send Compressed File To Your Pm", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="Bᴏᴛ Pᴍ", url=f'https://t.me/{botusername.username}')]]))
             
         else:
             await ms.delete()
 
-        await cleanup_resources(UID, ph_path) # Use await
+        try:
+            shutil.rmtree(f"ffmpeg/{UID}")
+            shutil.rmtree(f"encode/{UID}")
+            os.remove(ph_path)
+        except BaseException:
+            os.remove(f"ffmpeg/{UID}")
+            os.remove(f"ffmpeg/{UID}")
+
         
     except Exception as e:
         print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
-
-    finally: #Important to Process Next In Queue after success/failure
-        await process_next_in_queue(UID)
-
-
-#3. Add the `process_next_in_queue` function and `cleanup_resources` function
-async def process_next_in_queue(user_id):
-    if user_id in USER_QUEUES and USER_QUEUES[user_id]:
-        # Get the next video from the queue
-        next_video = USER_QUEUES[user_id].pop(0)  # Remove the first item
-        await process_video(next_video)
-    else:
-        # No more videos in the queue, cleanup directories
-        await cleanup_resources(user_id)
-
-async def cleanup_resources(user_id, ph_path=None):
-    try:
-        shutil.rmtree(f"ffmpeg/{user_id}")
-        shutil.rmtree(f"encode/{user_id}")
-        if ph_path:
-            os.remove(ph_path)
-    except Exception as e:
-        print(f"Error cleaning up resources: {e}")
