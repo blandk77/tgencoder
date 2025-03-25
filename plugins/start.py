@@ -83,6 +83,55 @@ async def Files_Option(bot:Client, message:Message):
     except Exception as e:
         print(e)
 
+@Client.on_message(filters.command("rqueue") & filters.private)
+async def handle_rqueue(client: Client, message: Message):
+    """Handles the /rqueue command to remove a file from the queue."""
+    try:
+        queue_position = message.command[1]  # Get queue position from command
+        await cancelqueue(client, message, queue_position)
+    except IndexError:
+        await message.reply_text("Please specify the queue position to remove (e.g., /rqueue 2)")
+    except Exception as e:
+        print(f"Error in rqueue handler: {e}")
+        await message.reply_text(f"An error occurred: {e}")
+
+
+@Client.on_message(filters.command("vqueue") & filters.private)
+async def handle_vqueue(client: Client, message: Message):
+    """Handles the /vqueue command to list files in the queue."""
+    queue_list = "<b>Queue:</b>\n"
+    temp_list = []
+    count = 1
+    
+    # Get current user id
+    user_id = message.from_user.id
+    
+    # Iterate all queue
+    while not QUEUE.empty():
+      item = await QUEUE.get()
+      bot, query, ffmpegcode, c_thumb, ms = item
+      temp_list.append(item)
+      user_name = query.from_user.first_name or query.from_user.username
+      file = query.message.reply_to_message
+      file_name = getattr(file , file.media.value).file_name
+      queue_list += f"{count}. {file_name} - {user_name} ({user_id})\n"
+      count += 1
+      
+    # Put items in queue
+    for item in temp_list:
+      await QUEUE.put(item)
+    
+    if count == 1: # Queue is empty
+      queue_list = "Queue is empty"
+
+    await message.reply_text(queue_list, parse_mode=enums.ParseMode.HTML)
+
+
+@Client.on_message(filters.command("hwn") & filters.private)
+async def handle_hwn(client: Client, message: Message):
+    """Handles the /hwn command to display help text."""
+    await message.reply_text(Txt.help_wm, parse_mode=enums.ParseMode.HTML)
+    
 @Client.on_message((filters.private | filters.group) & filters.command('cancel'))
 async def cancel_process(bot:Client, message:Message):
     
