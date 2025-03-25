@@ -1,4 +1,3 @@
-
 import asyncio
 import math
 import time
@@ -59,6 +58,7 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
                         ]
                     ]
                 ),
+                parse_mode=enums.ParseMode.HTML
             )
         except:
             pass
