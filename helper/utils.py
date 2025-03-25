@@ -394,7 +394,8 @@ async def process_queue():
     print("Queue processing complete.")
 
 
-async def cancelqueue(bot, message, queue_position):
+async def cancelqueue(message, queue_position): # Remove bot as parameter
+    """Cancels a task from the queue."""
     try:
         queue_position = int(queue_position)
     except ValueError:
@@ -415,7 +416,7 @@ async def cancelqueue(bot, message, queue_position):
             bot, query, ffmpegcode, c_thumb, ms = item
             UID = query.from_user.id
             try:
-                await skip(query, UID)
+                await skip(query, UID) # Pass query itself to skip
                 await ms.edit("Task removed from queue and cancelled.")
             except Exception as e:
                 print(f"Error cancelling task: {e}")
