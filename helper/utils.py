@@ -14,7 +14,7 @@ from config import Config
 from script import Txt
 from pyrogram import enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
-from helper.database import db  # Import the database module
+from helper.database import db
 
 # Global Queue
 QUEUE = asyncio.Queue()
@@ -35,8 +35,8 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
         estimated_total_time = TimeFormatter(milliseconds=estimated_total_time)
 
         progress = "{0}{1}".format(
-            ''.join(["⬢" for i in range(math.floor(percentage / 5))]),
-            ''.join(["⬡" for i in range(20 - math.floor(percentage / 5))]),
+            "".join(["⬢" for i in range(math.floor(percentage / 5))]),
+            "".join(["⬡" for i in range(20 - math.floor(percentage / 5))]),
         )
         tmp = progress + Txt.PROGRESS_BAR.format(
             round(percentage, 2),
@@ -58,7 +58,7 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
                         ]
                     ]
                 ),
-                parse_mode=enums.ParseMode.HTML
+                parse_mode=enums.ParseMode.HTML,
             )
         except:
             pass
@@ -154,6 +154,35 @@ async def CANT_CONFIG_GROUP_MSG(client, message):
     await ms.delete()
 
 
+async def get_sys_stats():
+    # Memory usage
+    vm = psutil.virtual_memory()
+    total_memory = humanbytes(vm.total)
+    available_memory = humanbytes(vm.available)
+    used_memory = humanbytes(vm.used)
+    memory_percent = vm.percent
+
+    # Disk usage
+    disk = psutil.disk_usage("/")
+    total_disk = humanbytes(disk.total)
+    free_disk = humanbytes(disk.free)
+    used_disk = humanbytes(disk.used)
+    disk_percent = disk.percent
+
+    # CPU usage
+    cpu_percent = psutil.cpu_percent()
+
+    stats = f"""
+**System Stats:**
+CPU Usage: {cpu_percent}%
+Memory Usage: {used_memory}/{total_memory} ({memory_percent}%)
+Disk Usage: {used_disk}/{total_disk} ({disk_percent}%)
+Available Memory: {available_memory}
+Free Disk Space: {free_disk}
+"""
+    return stats
+
+
 async def Compress_Stats(e, userid):
     if int(userid) not in [e.from_user.id, 0]:
         return await e.answer(
@@ -169,7 +198,8 @@ async def Compress_Stats(e, userid):
         processing_file_name = inp.replace(f"ffmpeg/{userid}/", "").replace(
             f"_", " "
         )
-        ans = f"Processing Media: {processing_file_name}\n\nDownloaded: {ov}\n\nCompressed: {ot}"
+        system_stats = await get_sys_stats()
+        ans = f"Processing Media: {processing_file_name}\n\nDownloaded: {ov}\n\nCompressed: {ot}\n\n{system_stats}"
         await e.answer(ans, cache_time=0, show_alert=True)
     except Exception as er:
         print(er)
@@ -211,10 +241,13 @@ async def CompressVideo(bot, query, ffmpegcode, c_thumb):
 
     # Add the task to the queue
     await QUEUE.put((bot, query, ffmpegcode, c_thumb, ms))
-    await ms.edit(f"Added to Queue Position {QUEUE.qsize()}")
+    queue_size = QUEUE.qsize()
+    await ms.edit(f"Added to Queue. Position: {queue_size}\nPress /cancelqueue {queue_size} to remove from queue.")
+
     # Start processing the queue if not already running
     if not PROCESSING:
         asyncio.create_task(process_queue())
+
 
 async def process_queue():
     global PROCESSING
@@ -359,3 +392,37 @@ async def process_queue():
 
     PROCESSING = False  # Reset processing flag when queue is empty.
     print("Queue processing complete.")
+
+
+async def cancelqueue(bot, message, queue_position):
+    try:
+        queue_position = int(queue_position)
+    except ValueError:
+        await message.reply_text("Invalid queue position. Please provide a number.")
+        return
+
+    if queue_position <= 0 or queue_position > QUEUE.qsize():
+        await message.reply_text("Invalid queue position.")
+        return
+
+    temp_list = []
+    count = 1
+    while not QUEUE.empty():
+        item = await QUEUE.get()
+        if count != queue_position:
+            temp_list.append(item)
+        else:
+            bot, query, ffmpegcode, c_thumb, ms = item
+            UID = query.from_user.id
+            try:
+                await skip(query, UID)
+                await ms.edit("Task removed from queue and cancelled.")
+            except Exception as e:
+                print(f"Error cancelling task: {e}")
+                await message.reply_text(f"Error cancelling task: {e}")
+        count += 1
+
+    for item in temp_list:
+        await QUEUE.put(item)
+
+    await message.reply_text(f"Task at position {queue_position} removed from queue.")
