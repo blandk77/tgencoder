@@ -75,3 +75,6 @@ Available commands:-
 ├💾 Dᴀᴛᴀ Bᴀꜱᴇ: <a href=https://cloud.mongodb.com>Mᴏɴɢᴏ DB</a>
 ├🌀 ᴍʏ ꜱᴇʀᴠᴇʀ : <a href=https://dashboard.heroku.com>Heroku</a>
 ╰───────────────⍟ """
+    help_wm = """"
+    Working.......
+    """
