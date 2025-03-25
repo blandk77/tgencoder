@@ -150,7 +150,7 @@ async def Compress_Stats(e, userid):
     outp = f"encode/{e.from_user.id}/{os.listdir(f'encode/{e.from_user.id}')[0]}"
     try:
         ot = humanbytes(int((Path(outp).stat().st_size)))
-        ov = humanbytes(int(Path(inp).stat().st_size)))
+        ov = humanbytes(int((Path(inp).stat().st_size)))
         processing_file_name = inp.replace(f"ffmpeg/{userid}/", "").replace(f"_", " ")
         ans = f"Processing Media: {processing_file_name}\n\nDownloaded: {ov}\n\nCompressed: {ot}"
         await e.answer(ans, cache_time=0, show_alert=True)
