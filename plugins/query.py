@@ -91,6 +91,7 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
             BTNS = [
                 [InlineKeyboardButton(text='𝟯𝟲𝟬𝗽', callback_data='360pc'), InlineKeyboardButton(
                     text='𝟰𝟴𝟬𝗽', callback_data='480pc')],
+                [InlineKeyboardButton(text='𝟺𝟾𝟶𝚙', callback_data='480ps')],
                 [InlineKeyboardButton(text='𝟳𝟮𝟬𝗽', callback_data='720pc'), InlineKeyboardButton(
                     text='𝟭𝟬𝟴𝟬𝗽', callback_data='1080pc')],
                 [InlineKeyboardButton(
@@ -118,6 +119,15 @@ async def Cb_Handle(bot: Client, query: CallbackQuery):
         except Exception as e:
             print(e)
 
+    elif data == '480ps':
+        try:
+            c_thumb = await db.get_thumbnail(query.from_user.id)
+            ffmpeg = "-preset veryfast -c:v libx265 -s 854x480 -x265-params 'bframes=8:psy-rd=1:ref=3:aq-mode=3:aq-strength=0.8:deblock=1,1' -pix_fmt yuv420p -crf 27 -c:a libopus -b:a 32k -c:s copy -map 0 -ac 2 -ab 32k -vbr 2 -level 3.1 -threads 1"
+            await CompressVideo(bot=bot, query=query, ffmpegcode=ffmpeg, c_thumb=c_thumb)
+
+        except Exception as e:
+            print(e)
+    
     elif data == '720pc':
 
         try:
