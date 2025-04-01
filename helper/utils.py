@@ -16,9 +16,7 @@ from pyrogram import enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from helper.database import db  # Import the database module
 
-# Global Queue
-QUEUE = asyncio.Queue()
-PROCESSING = False
+QUEUE = []
 
 
 async def progress_for_pyrogram(current, total, ud_type, message, start):
@@ -36,7 +34,7 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
 
         progress = "{0}{1}".format(
             ''.join(["⬢" for i in range(math.floor(percentage / 5))]),
-            ''.join(["⬡" for i in range(20 - math.floor(percentage / 5))]),
+            ''.join(["⬡" for i in range(20 - math.floor(percentage / 5))])
         )
         tmp = progress + Txt.PROGRESS_BAR.format(
             round(percentage, 2),
@@ -57,7 +55,7 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
                             )
                         ]
                     ]
-                ), parse_mode=enums.ParseMode.HTML
+                ),
             )
         except:
             pass
@@ -208,41 +206,26 @@ async def CompressVideo(bot, query, ffmpegcode, c_thumb):
     UID = query.from_user.id
     ms = await query.message.edit("Pʟᴇᴀsᴇ Wᴀɪᴛ...\n\n**Fᴇᴛᴄʜɪɴɢ Qᴜᴇᴜᴇ 👥**")
 
-    # Add the task to the queue
-    await QUEUE.put((bot, query, ffmpegcode, c_thumb, ms))
-    await ms.edit(f"Added to Queue Position {QUEUE.qsize()}")
-    # Start processing the queue if not already running
-    if not PROCESSING:
-        asyncio.create_task(process_queue())
+    if os.path.isdir(f"ffmpeg/{UID}") and os.path.isdir(f"encode/{UID}"):
+        return await ms.edit(
+            "**⚠️ Yᴏᴜ ᴄᴀɴ ᴄᴏᴍᴘʀᴇss ᴏɴʟʏ ᴏɴᴇ ғɪʟᴇ ᴀᴛ ᴀ ᴛɪᴍᴇ\n\nAs ᴛʜɪs ʜᴇʟᴘs ʀᴇᴅᴜᴄᴇ sᴇʀᴠᴇʀ ʟᴏᴀᴅ.**"
+        )
 
-async def process_queue():
-    global PROCESSING
-    PROCESSING = True
-    while not QUEUE.empty():
-        bot, query, ffmpegcode, c_thumb, ms = await QUEUE.get()
-        UID = query.from_user.id
+    try:
+        media = query.message.reply_to_message
+        file = getattr(media, media.media.value)
+        filename = Filename(filename=str(file.file_name), mime_type=str(file.mime_type))
+        Download_DIR = f"ffmpeg/{UID}"
+        Output_DIR = f"encode/{UID}"
+        File_Path = f"ffmpeg/{UID}/{filename}"
+        Output_Path = f"encode/{UID}/{filename}"
+
+        await ms.edit("⚠️__**Please wait...**__\n**Tʀyɪɴɢ Tᴏ Dᴏᴡɴʟᴏᴀᴅɪɴɢ....**")
+        s = dt.now()
         try:
-            if os.path.isdir(f"ffmpeg/{UID}") and os.path.isdir(f"encode/{UID}"):
-                await ms.edit(
-                    "**⚠️ Yᴏᴜ ᴄᴀɴ ᴄᴏᴍᴘʀᴇss ᴏɴʟʏ ᴏɴᴇ ғɪʟᴇ ᴀᴛ ᴀ ᴛɪᴍᴇ\n\nAs ᴛʜɪs ʜᴇʟᴘs ʀᴇᴅᴜᴄᴇ sᴇʀᴠᴇʀ ʟᴏᴀᴅ.**"
-                )
-                QUEUE.task_done()  # Mark the task as complete, even though it wasn't processed.
-                continue  # Skip to the next item in the queue.
-
-            media = query.message.reply_to_message
-            file = getattr(media, media.media.value)
-            filename = Filename(filename=str(file.file_name), mime_type=str(file.mime_type))
-            Download_DIR = f"ffmpeg/{UID}"
-            Output_DIR = f"encode/{UID}"
-            File_Path = f"ffmpeg/{UID}/{filename}"
-            Output_Path = f"encode/{UID}/{filename}"
-
-            await ms.edit("⚠️__**Please wait...**__\n**Tʀyɪɴɢ Tᴏ Dᴏᴡɴʟᴏᴀᴅɪɴɢ....**")
-            s = dt.now()
-            try:
-                if not os.path.isdir(Download_DIR) and not os.path.isdir(Output_DIR):
-                    os.makedirs(Download_DIR)
-                    os.makedirs(Output_DIR)
+            if not os.path.isdir(Download_DIR) and not os.path.isdir(Output_DIR):
+                os.makedirs(Download_DIR)
+                os.makedirs(Output_DIR)
 
                 dl = await bot.download_media(
                     message=file,
@@ -254,107 +237,101 @@ async def process_queue():
                         time.time(),
                     ),
                 )
-            except Exception as e:
-                await ms.edit(str(e))
-                shutil.rmtree(f"ffmpeg/{UID}", ignore_errors=True)
-                shutil.rmtree(f"encode/{UID}", ignore_errors=True)
-                QUEUE.task_done()
-                continue
+        except Exception as e:
+            return await ms.edit(str(e))
 
-            es = dt.now()
-            dtime = ts(int((es - s).seconds) * 1000)
+        es = dt.now()
+        dtime = ts(int((es - s).seconds) * 1000)
 
-            await ms.edit(
-                "**🗜 Compressing...**",
-                reply_markup=InlineKeyboardMarkup(
-                    [
-                        [InlineKeyboardButton(text="Sᴛᴀᴛs", callback_data=f"stats-{UID}")],
-                        [InlineKeyboardButton(text="Cᴀɴᴄᴇʟ", callback_data=f"skip-{UID}")],
-                    ]
+        await ms.edit(
+            "**🗜 Compressing...**",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton(text="Sᴛᴀᴛs", callback_data=f"stats-{UID}")],
+                    [InlineKeyboardButton(text="Cᴀɴᴄᴇʟ", callback_data=f"skip-{UID}")],
+                ]
+            ),
+        )
+
+        # Get watermark code from the database
+        watermark_code = await db.get_watermark(query.from_user.id)
+
+        # Build the FFmpeg command
+        if watermark_code:
+            final_ffmpeg_code = f"{ffmpegcode} {watermark_code}"  # Add watermark
+        else:
+            final_ffmpeg_code = ffmpegcode  # No watermark
+
+        cmd = f"""ffmpeg -i "{dl}" {final_ffmpeg_code} "{Output_Path}" -y"""
+
+        process = await asyncio.create_subprocess_shell(
+            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+
+        stdout, stderr = await process.communicate()
+        er = stderr.decode()
+
+        try:
+            if er:
+                await ms.edit(str(er) + "\n\n**Error**")
+                # shutil.rmtree(f"ffmpeg/{UID}") # These lines are not needed here.
+                # shutil.rmtree(f"encode/{UID}") #These lines are not needed here.
+                return
+        except BaseException:
+            pass
+
+        # Clean up resources
+        # Now Uploading to the User
+        ees = dt.now()
+
+        if file.thumbs or c_thumb:
+            if c_thumb:
+                ph_path = await bot.download_media(c_thumb)
+            else:
+                ph_path = await bot.download_media(file.thumbs[0].file_id)
+
+        org = int(Path(File_Path).stat().st_size)
+        com = int((Path(Output_Path).stat().st_size))
+        pe = 100 - ((com / org) * 100)
+        per = str(f"{pe:.2f}") + "%"
+        eees = dt.now()
+        x = dtime
+        xx = ts(int((ees - es).seconds) * 1000)
+        xxx = ts(int((eees - ees).seconds) * 1000)
+        await ms.edit("⚠️__**Please wait...**__\n**Tʀyɪɴɢ Tᴏ Uᴩʟᴏᴀᴅɪɴɢ....**")
+        try:
+            await bot.send_document(
+                UID,
+                document=Output_Path,
+                thumb=ph_path,
+                caption=Config.caption.format(
+                    filename, humanbytes(org), humanbytes(com), per, x, xx, xxx
+                ),
+                progress=progress_for_pyrogram,
+                progress_args=(
+                    "⚠️__**Please wait...**__\n🌨️ **Uᴩʟᴏᴅ Sᴛᴀʀᴛᴇᴅ....**",
+                    ms,
+                    time.time(),
                 ),
             )
-
-            # Get watermark code from the database
-            watermark_code = await db.get_watermark(query.from_user.id)
-
-            # Build the FFmpeg command
-            if watermark_code:
-                final_ffmpeg_code = f"{ffmpegcode} {watermark_code}"  # Add watermark
-            else:
-                final_ffmpeg_code = ffmpegcode  # No watermark
-
-            cmd = f"""ffmpeg -i "{dl}" {final_ffmpeg_code} "{Output_Path}" -y"""
-
-            process = await asyncio.create_subprocess_shell(
-                cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-
-            stdout, stderr = await process.communicate()
-            er = stderr.decode()
-
-            try:
-                if er:
-                    await ms.edit(str(er) + "\n\n**Error**")
-                    shutil.rmtree(f"ffmpeg/{UID}", ignore_errors=True)
-                    shutil.rmtree(f"encode/{UID}", ignore_errors=True)
-                    QUEUE.task_done()
-                    continue
-            except BaseException:
-                pass
-
-            # Clean up resources
-            # Now Uploading to the User
-            ees = dt.now()
-
-            if file.thumbs or c_thumb:
-                if c_thumb:
-                    ph_path = await bot.download_media(c_thumb)
-                else:
-                    ph_path = await bot.download_media(file.thumbs[0].file_id)
-
-            org = int(Path(File_Path).stat().st_size)
-            com = int((Path(Output_Path).stat().st_size))
-            pe = 100 - ((com / org) * 100)
-            per = str(f"{pe:.2f}") + "%"
-            eees = dt.now()
-            x = dtime
-            xx = ts(int((ees - es).seconds) * 1000)
-            xxx = ts(int((eees - ees).seconds) * 1000)
-            await ms.edit("⚠️__**Please wait...**__\n**Tʀyɪɴɢ Tᴏ Uᴩʟᴏᴀᴅɪɴɢ....**")
-            try:
-                await bot.send_document(
-                    UID,
-                    document=Output_Path,
-                    thumb=ph_path,
-                    caption=Config.caption.format(
-                        filename, humanbytes(org), humanbytes(com), per, x, xx, xxx
-                    ),
-                    progress=progress_for_pyrogram,
-                    progress_args=(
-                        "⚠️__**Please wait...**__\n🌨️ **Uᴩʟᴏᴅ Sᴛᴀʀᴛᴇᴅ....**",
-                        ms,
-                        time.time(),
-                    ),
-                )
-            except Exception as e:
-                await ms.edit(f"Upload failed: {e}")  # Inform user about upload failure
-            finally:
-                try:
-                    os.remove(dl)
-                    os.remove(Output_Path)
-                    if "ph_path" in locals():
-                        os.remove(ph_path)
-                    shutil.rmtree(
-                        f"ffmpeg/{UID}", ignore_errors=True
-                    )  # Use ignore_errors=True
-                    shutil.rmtree(
-                        f"encode/{UID}", ignore_errors=True
-                    )  # Use ignore_errors=True
-
-                except Exception as e:
-                    print(f"Error cleaning up: {e}")
+        except Exception as e:
+            await ms.edit(f"Upload failed: {e}")  # Inform user about upload failure
         finally:
-            QUEUE.task_done()  # Ensure task_done is always called.
+            try:
+                os.remove(dl)
+                os.remove(Output_Path)
+                if "ph_path" in locals():
+                    os.remove(ph_path)
+                shutil.rmtree(
+                    f"ffmpeg/{UID}", ignore_errors=True
+                )  # Use ignore_errors=True
+                shutil.rmtree(
+                    f"encode/{UID}", ignore_errors=True
+                )  # Use ignore_errors=True
 
-    PROCESSING = False  # Reset processing flag when queue is empty.
-    print("Queue processing complete.")
+            except Exception as e:
+                print(f"Error cleaning up: {e}")
+
+    except Exception as e:
+        print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
+        
