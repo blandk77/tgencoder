@@ -181,7 +181,6 @@ async def see_metadata(client, message):
 
 user_data = {}
 
-# Position mappings (predefined positions in drawtext coordinates)
 POSITION_MAP = {
     "top left": "x=10:y=10",
     "top center": "x=(w-tw)/2:y=10",
@@ -208,89 +207,126 @@ POSITION_KEYBOARD = InlineKeyboardMarkup([
     [InlineKeyboardButton("Custom Position", callback_data="pos:custom")]
 ])
 
-@Client.on_message((filters.group | filters.private) & filters.command('set_wm'))
+@Client.on_message(filters.command('set_wm'))
 async def set_wm(client, message):
     if not await db.is_user_exist(message.from_user.id):
         await CANT_CONFIG_GROUP_MSG(client, message)
         return
 
-    # Initialize user data
     user_data[message.from_user.id] = {}
-    
-    # Ask for watermark text
-    await message.reply_text("Send me the text for the watermark (e.g., 'Waves')", reply_to_message_id=message.id)
+    await message.reply_text(
+        "Send me the text for the watermark (e.g., 'Waves')",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:position")]])
+    )
 
-@Client.on_message(filters.group | filters.private)
-async def handle_wm_steps(client, message):
+@Client.on_message(filters.text)  # Simplified filter to catch all text messages
+async def handle_text_input(client, message):
     user_id = message.from_user.id
     if user_id not in user_data:
         return  # Ignore if user hasn't started the process
 
     data = user_data[user_id]
     
-    # Step 1: Capture watermark text
     if "text" not in data:
         data["text"] = message.text
-        await message.delete()  # Delete user's input
+        await message.delete()
         await message.reply_text(
-            "Choose the position for the text:",
-            reply_markup=POSITION_KEYBOARD
+            f"Text set to: {data['text']}\nClick 'Next' to choose position.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:position")]])
         )
     
-    # Step 3: Custom position input
     elif "waiting_for_custom" in data:
         try:
             x, y = map(int, message.text.split())
             data["position"] = f"x={x}:y={y}"
             del data["waiting_for_custom"]
             await message.delete()
-            await message.reply_text("Now send me the opacity to use in the video (e.g., 100, 70, 60, etc.)")
+            await message.reply_text(
+                "Now send me the opacity (e.g., 100, 70, 60)",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:opacity")]])
+            )
         except:
-            await message.reply_text("Invalid format! Please send like: [10] [10]")
-    
-    # Step 4: Capture opacity
+            await message.reply_text("Invalid format! Send like: [10] [10]")
+
     elif "opacity" not in data:
         try:
             opacity = int(message.text)
             if 0 <= opacity <= 100:
-                data["opacity"] = opacity / 100  # Convert to 0.0-1.0 range for drawtext
+                data["opacity"] = opacity / 100
                 await message.delete()
-                await message.reply_text("Now send me the color for the text (e.g., white, red, blue)")
+                await message.reply_text(
+                    "Now send me the color (e.g., white, red, blue)",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:color")]])
+                )
             else:
                 await message.reply_text("Opacity must be between 0 and 100!")
         except:
-            await message.reply_text("Please send a valid number (e.g., 100, 70)")
-    
-    # Step 5: Capture color
+            await message.reply_text("Send a valid number (e.g., 100, 70)")
+
     elif "color" not in data:
         data["color"] = message.text.lower()
         await message.delete()
-        await message.reply_text("Now send me the font size (e.g., 24, 36)")
+        await message.reply_text(
+            "Now send me the font size (e.g., 24, 36)",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:font_size")]])
+        )
     
-    # Step 6: Capture font size and finalize
     elif "font_size" not in data:
         try:
             font_size = int(message.text)
             data["font_size"] = font_size
             await message.delete()
-            
-            # Construct the drawtext filter
-            wm_code = (
-                f'-vf "drawtext=text=\'{data["text"]}\':'
-                f'fontcolor={data["color"]}:'
-                f'fontsize={data["font_size"]}:'
-                f'{data["position"]}:'
-                f'alpha={data["opacity"]}"'
+            await message.reply_text(
+                "Click 'Finish' to save the watermark.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Finish", callback_data="step:finish")]])
             )
-            
-            # Save to database
-            await db.set_watermark(user_id, watermark=wm_code)
-            
-            # Clean up and notify user
-            del user_data[user_id]
-            await message.reply_text("✅ __**Watermark Code Saved**__")
         except:
-            await message.reply_text("Please send a valid number (e.g., 24, 36)")
+            await message.reply_text("Send a valid number (e.g., 24, 36)")
+
+@Client.on_callback_query(filters.regex(r"^step:"))
+async def handle_step(client, callback_query):
+    user_id = callback_query.from_user.id
+    if user_id not in user_data:
+        return
+
+    step = callback_query.data.split(":")[1]
+    data = user_data[user_id]
+
+    if step == "position" and "text" in data:
+        await callback_query.message.edit_text(
+            "Choose the position for the text:",
+            reply_markup=POSITION_KEYBOARD
+        )
+    
+    elif step == "opacity" and "position" in data:
+        await callback_query.message.edit_text(
+            "Now send me the opacity (e.g., 100, 70, 60)",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:color")]])
+        )
+    
+    elif step == "color" and "opacity" in data:
+        await callback_query.message.edit_text(
+            "Now send me the color (e.g., white, red, blue)",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:font_size")]])
+        )
+    
+    elif step == "font_size" and "color" in data:
+        await callback_query.message.edit_text(
+            "Now send me the font size (e.g., 24, 36)",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Finish", callback_data="step:finish")]])
+        )
+    
+    elif step == "finish" and "font_size" in data:
+        wm_code = (
+            f'-vf "drawtext=text=\'{data["text"]}\':'
+            f'fontcolor={data["color"]}:'
+            f'fontsize={data["font_size"]}:'
+            f'{data["position"]}:'
+            f'alpha={data["opacity"]}"'
+        )
+        await db.set_watermark(user_id, watermark=wm_code)
+        del user_data[user_id]
+        await callback_query.message.edit_text("✅ __**Watermark Code Saved**__")
 
 @Client.on_callback_query(filters.regex(r"^pos:"))
 async def handle_position_selection(client, callback_query):
@@ -299,13 +335,17 @@ async def handle_position_selection(client, callback_query):
         return
 
     pos_choice = callback_query.data.split(":")[1]
+    data = user_data[user_id]
     
     if pos_choice == "custom":
-        user_data[user_id]["waiting_for_custom"] = True
+        data["waiting_for_custom"] = True
         await callback_query.message.edit_text("Send me the position, e.g., [10] [10]")
     else:
-        user_data[user_id]["position"] = POSITION_MAP[pos_choice]
-        await callback_query.message.edit_text("Now send me the opacity to use in the video (e.g., 100, 70, 60, etc.)")
+        data["position"] = POSITION_MAP[pos_choice]
+        await callback_query.message.edit_text(
+            "Now send me the opacity (e.g., 100, 70, 60)",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Next", callback_data="step:opacity")]])
+        )
 
 # Existing view_wm and delete_wm remain unchanged
 @Client.on_message((filters.group | filters.private) & filters.command('view_wm'))
