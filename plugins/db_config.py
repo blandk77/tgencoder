@@ -220,7 +220,7 @@ async def set_wm(client, message):
     # Ask for watermark text
     await message.reply_text("Send me the text for the watermark (e.g., 'Waves')", reply_to_message_id=message.id)
 
-@Client.on_message((filters.group | filters.private) & ~filters.command())
+@Client.on_message(filters.group | filters.private)
 async def handle_wm_steps(client, message):
     user_id = message.from_user.id
     if user_id not in user_data:
@@ -260,7 +260,7 @@ async def handle_wm_steps(client, message):
                 await message.reply_text("Opacity must be between 0 and 100!")
         except:
             await message.reply_text("Please send a valid number (e.g., 100, 70)")
-
+    
     # Step 5: Capture color
     elif "color" not in data:
         data["color"] = message.text.lower()
