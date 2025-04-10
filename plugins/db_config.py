@@ -15,6 +15,7 @@ position_buttons = [
     ["center left", "center", "center right"],
     ["bottom left", "bottom center", "bottom right"],
     ["custom position"]
+]
 
 
 @Client.on_message((filters.group | filters.private) & filters.command('set_caption'))
