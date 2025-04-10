@@ -1,8 +1,20 @@
 from pyrogram import Client, filters, enums
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import db
 from helper.utils import CANT_CONFIG_GROUP_MSG
 from script import Txt
 from asyncio.exceptions import TimeoutError
+
+
+TEXT_TIMEOUT = 30
+OTHER_TIMEOUT = 60
+
+# Position buttons
+position_buttons = [
+    ["top left", "top center", "top right"],
+    ["center left", "center", "center right"],
+    ["bottom left", "bottom center", "bottom right"],
+    ["custom position"]
 
 
 @Client.on_message((filters.group | filters.private) & filters.command('set_caption'))
@@ -169,19 +181,76 @@ async def see_metadata(client, message):
     else:
         await SnowDev.edit(f"😔 __**Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Aɴy Mᴇᴛᴀᴅᴀᴛᴀ Cᴏᴅᴇ**__")
 
+def generate_position_markup():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(pos, callback_data=f"position:{pos}") for pos in row]
+        for row in position_buttons
+    ])
+
+async def ask_user(client, message, question, timeout=OTHER_TIMEOUT):
+    try:
+        await message.reply_text(question)
+        response = await client.listen(message.chat.id, timeout=timeout)
+        return response.text
+    except TimeoutError:
+        await message.reply_text("⏳ Timeout reached! Process canceled.")
+        return None
+
 @Client.on_message((filters.group | filters.private) & filters.command('set_wm'))
 async def set_wm(client, message):
     if not await db.is_user_exist(message.from_user.id):
         await CANT_CONFIG_GROUP_MSG(client, message)
         return
 
-    if len(message.command) == 1:
-        return await message.reply_text("**__Gɪᴠᴇ Tʜᴇ Wᴀᴛᴇʀᴍᴀʀᴋ Cᴏᴅᴇ__\n\nExᴀᴍᴩʟᴇ:- `/set_wm -vf \"drawtext=text='Heloo':fontcolor=white:fontsize=24:x=10:y=10\"`**")
+    # Step 1: Ask for watermark text
+    text = await ask_user(client, message, "Send me the text for the watermark", timeout=TEXT_TIMEOUT)
+    if not text:
+        return
 
-    SnowDev = await message.reply_text(text="**Please Wait...**", reply_to_message_id=message.id)
-    wm_code = message.text.split(" ", 1)[1]
-    await db.set_watermark(message.from_user.id, watermark=wm_code)
-    await SnowDev.edit("✅ __**Wᴀᴛᴇʀᴍᴀʀᴋ Cᴏᴅᴇ Sᴀᴠᴇᴅ**__")
+    # Step 2: Ask for position
+    await message.reply_text("Choose the position for the text", reply_markup=generate_position_markup())
+
+    def valid_position_callback(_, callback_query):
+        return callback_query.data.startswith("position:")
+
+    try:
+        callback_query = await client.listen(message.chat.id, valid_position_callback, timeout=OTHER_TIMEOUT)
+        position = callback_query.data.split(":", 1)[1]
+        await callback_query.message.edit_text(f"✅ Position chosen: {position}")
+
+        if position == "custom position":
+            position = await ask_user(client, message, "Send me the position eg: [10] [10]")
+            if not position or not position.replace(" ", "").isdigit():
+                await message.reply_text("❌ Invalid position! Please restart the process.")
+                return
+    except TimeoutError:
+        await message.reply_text("⏳ Timeout reached! Process canceled.")
+        return
+
+    # Step 3: Ask for opacity
+    opacity = await ask_user(client, message, "Now send me the opacity to use in the video. Eg: 100, 70, 60... Etc.")
+    if not opacity or not opacity.isdigit():
+        await message.reply_text("❌ Invalid opacity! Please restart the process.")
+        return
+
+    # Step 4: Ask for color
+    color = await ask_user(client, message, "Send me the color for the text. Eg: white, black, red... Etc.")
+    if not color:
+        await message.reply_text("❌ Invalid color! Please restart the process.")
+        return
+
+    # Step 5: Ask for font size
+    font_size = await ask_user(client, message, "Send me the font size for the text. Eg: 24, 30... Etc.")
+    if not font_size or not font_size.isdigit():
+        await message.reply_text("❌ Invalid font size! Please restart the process.")
+        return
+
+    # Step 6: Generate drawtext command
+    drawtext_command = f"-vf drawtext=text='{text}':fontcolor={color}:fontsize={font_size}:x={position}:y={position}:opacity={opacity}"
+
+    # Save to database
+    await db.set_watermark(message.from_user.id, watermark=drawtext_command)
+    await message.reply_text(f"✅ Watermark set successfully!\n\n<code>{drawtext_command}</code>")
 
 
 @Client.on_message((filters.group | filters.private) & filters.command('view_wm'))
