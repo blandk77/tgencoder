@@ -10,25 +10,25 @@ from asyncio.exceptions import TimeoutError
 TEXT_TIMEOUT = 30
 OTHER_TIMEOUT = 60
 
-# Predefined positions with their respective x and y values
-positions_map = {
-    "top_left": {"x": "10", "y": "10"},
-    "top_center": {"x": "(w-text_w)/2", "y": "10"},
-    "top_right": {"x": "w-text_w-10", "y": "10"},
-    "center_left": {"x": "10", "y": "(h-text_h)/2"},
-    "center": {"x": "(w-text_w)/2", "y": "(h-text_h)/2"},
-    "center_right": {"x": "w-text_w-10", "y": "(h-text_h)/2"},
-    "bottom_left": {"x": "10", "y": "h-text_h-10"},
-    "bottom_center": {"x": "(w-text_w)/2", "y": "h-text_h-10"},
-    "bottom_right": {"x": "w-text_w-10", "y": "h-text_h-10"}
-}
-
-# Position buttons
 position_buttons = [
-    ["top_left", "top_center", "top_right"],
-    ["center_left", "center", "center_right"],
-    ["bottom_left", "bottom_center", "bottom_right"],
-    ["custom_position"]
+    [
+        InlineKeyboardButton("Top Left", callback_data="Tleft"),
+        InlineKeyboardButton("Top Center", callback_data="Tcenter"),
+        InlineKeyboardButton("Top Right", callback_data="Tright")
+    ],
+    [
+        InlineKeyboardButton("Center Left", callback_data="Cleft"),
+        InlineKeyboardButton("Center", callback_data="Center"),
+        InlineKeyboardButton("Center Right", callback_data="Cright")
+    ],
+    [
+        InlineKeyboardButton("Bottom Left", callback_data="Bleft"),
+        InlineKeyboardButton("Bottom Center", callback_data="Bcenter"),
+        InlineKeyboardButton("Bottom Right", callback_data="Bright")
+    ],
+    [
+        InlineKeyboardButton("Custom Position", callback_data="Custom")
+    ]
 ]
 
 @Client.on_message((filters.group | filters.private) & filters.command('set_caption'))
@@ -195,12 +195,8 @@ async def see_metadata(client, message):
     else:
         await SnowDev.edit(f"😔 __**Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Aɴy Mᴇᴛᴀᴅᴀᴛᴀ Cᴏᴅᴇ**__")
 
-
 def generate_position_markup():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(pos.replace("_", " "), callback_data=f"position:{pos}") for pos in row]
-        for row in position_buttons
-    ])
+    return InlineKeyboardMarkup(position_buttons)
 
 async def ask_user(client, message, question, timeout=OTHER_TIMEOUT):
     try:
@@ -230,10 +226,7 @@ async def set_wm(client, message):
 
 @Client.on_callback_query()
 async def handle_position_callback(client, callback_query):
-    if not callback_query.data.startswith("position:"):
-        return
-
-    position = callback_query.data.split(":", 1)[1]
+    data = callback_query.data
     chat_id = callback_query.message.chat.id
 
     # Retrieve user state
@@ -242,22 +235,37 @@ async def handle_position_callback(client, callback_query):
         await callback_query.message.edit_text("❌ Process not started. Use /set_wm to begin.")
         return
 
-    if position == "custom_position":
+    # Map callback_data to positions
+    positions_map = {
+        "Tleft": {"xpos": "10", "ypos": "10", "pos": "Top Left"},
+        "Tcenter": {"xpos": "(w-text_w)/2", "ypos": "10", "pos": "Top Center"},
+        "Tright": {"xpos": "w-text_w-10", "ypos": "10", "pos": "Top Right"},
+        "Cleft": {"xpos": "10", "ypos": "(h-text_h)/2", "pos": "Center Left"},
+        "Center": {"xpos": "(w-text_w)/2", "ypos": "(h-text_h)/2", "pos": "Center"},
+        "Cright": {"xpos": "w-text_w-10", "ypos": "(h-text_h)/2", "pos": "Center Right"},
+        "Bleft": {"xpos": "10", "ypos": "h-text_h-10", "pos": "Bottom Left"},
+        "Bcenter": {"xpos": "(w-text_w)/2", "ypos": "h-text_h-10", "pos": "Bottom Center"},
+        "Bright": {"xpos": "w-text_w-10", "ypos": "h-text_h-10", "pos": "Bottom Right"}
+    }
+
+    if data == "Custom":
         # Handle custom position input
         custom_position = await ask_user(client, callback_query.message, "Send me the position in the format: x y (e.g., 10 10)")
         if not custom_position or len(custom_position.split()) != 2 or not all(i.isdigit() for i in custom_position.split()):
             await callback_query.message.reply_text("❌ Invalid position! Please restart the process.")
             return
-        x, y = custom_position.split()
+        xpos, ypos = custom_position.split()
+        pos = "Custom Position"
     else:
         # Predefined position
-        pos_values = positions_map.get(position)
-        x, y = pos_values["x"], pos_values["y"]
+        pos_data = positions_map.get(data)
+        xpos, ypos, pos = pos_data["xpos"], pos_data["ypos"], pos_data["pos"]
 
-    await callback_query.message.edit_text(f"✅ Position chosen: {position.replace('_', ' ')}")
+    await callback_query.message.edit_text(f"✅ Position chosen: {pos}")
 
-    user_state["x"] = x
-    user_state["y"] = y
+    user_state["xpos"] = xpos
+    user_state["ypos"] = ypos
+    user_state["pos"] = pos
 
     # Step 3: Ask for opacity
     opacity = await ask_user(client, callback_query.message, "Now send me the opacity to use in the video. Eg: 100, 70, 60... Etc.")
@@ -284,11 +292,11 @@ async def handle_position_callback(client, callback_query):
     user_state["font_size"] = font_size
 
     # Step 6: Generate drawtext command
-    drawtext_command = f"drawtext=text='{user_state['text']}':fontcolor={user_state['color']}:fontsize={user_state['font_size']}:x={user_state['x']}:y={user_state['y']}:opacity={user_state['opacity']}"
+    drawtext_command = f"drawtext=text='{user_state['text']}':fontcolor={user_state['color']}:fontsize={user_state['font_size']}:x={user_state['xpos']}:y={user_state['ypos']}:opacity={user_state['opacity']}"
 
     # Save to database
     await db.set_watermark(chat_id, watermark=drawtext_command)
-    await callback_query.message.reply_text(f"✅ Watermark set successfully!\n\n<code>{drawtext_command}</code>")        
+    await callback_query.message.reply_text(f"✅ Watermark set successfully!\n\n<code>{drawtext_command}</code>")
 
 
 @Client.on_message((filters.group | filters.private) & filters.command('view_wm'))
