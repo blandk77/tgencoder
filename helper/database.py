@@ -111,5 +111,11 @@ class Database:
         banned_users = self.col.find({'ban_status.is_banned': True})
         return banned_users
 
+    async def set_watermark(self, user_id, watermark):
+        await self.col.update_one({'id': int(user_id)}, {'$set': {'watermark': watermark}})
+
+    async def get_watermark(self, id):
+        user = await self.col.find_one({'id': int(id)})
+        return user.get('watermark', None)    
 
 db = Database(Config.DB_URL, Config.DB_NAME)
