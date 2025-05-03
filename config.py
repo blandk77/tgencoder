@@ -30,3 +30,6 @@ class Config(object):
     caption = """
 {0}
 """
+    WM = """
+    -vf "drawtext=text='For More Animes In Low MB, Check Out @Animes_Guy in Telegram':x='if(gte(t,240),w-(t-240)*60,NAN)':y=10:fontsize=20:fontcolor=white:enable='gte(t,240)':box=0"
+    """
