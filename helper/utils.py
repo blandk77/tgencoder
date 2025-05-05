@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # MongoDB setup
 try:
-    mongo_client = MongoClient(Config.MONGO_URI)
+    mongo_client = MongoClient(Config.DB_URL)
     db = mongo_client['encoding_bot']
     queue_collection = db['queue']
     logger.info("MongoDB connection successful")
