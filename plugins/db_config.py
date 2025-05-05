@@ -5,7 +5,73 @@ from script import Txt
 from asyncio.exceptions import TimeoutError
 from pymongo import MongoClient
 from config import Config
+import logging
 
+# MongoDB setup
+mongo_client = MongoClient(Config.DB_URL)
+db = mongo_client['encoding_bot']
+queue_collection = db['queue']
+
+@Client.on_message(filters.command(["queue", "q"]))
+async def show_queue(client, message):
+    logger.info(f"Queue command invoked by user {message.from_user.id}")
+    try:
+        tasks = list(queue_collection.find().sort("added_at", 1))
+        logger.info(f"Retrieved {len(tasks)} tasks from queue")
+        if not tasks:
+            await message.reply("Global queue is empty.")
+            return
+        
+        response = "Global queue:\n"
+        for idx, task in enumerate(tasks, 1):
+            status = "encoding" if task["status"] == "encoding" else "in queue"
+            response += f"""
+Task no: {idx}
+Status: {status}
+File name: {task['filename']}
+File size: {humanbytes(task['file_size'])}
+User: @{task['username']}
+Task Id: {task['task_id']}
+===================
+"""
+        await message.reply(response)
+    except Exception as e:
+        logger.error(f"Error in show_queue: {e}")
+        await message.reply("Failed to retrieve queue. Please try again.")
+
+@Client.on_message(filters.command(["remove", "r"]))
+async def remove_task(client, message):
+    logger.info(f"Remove command invoked by user {message.from_user.id} with args: {message.command}")
+    if len(message.command) < 2:
+        await message.reply("Please provide a Task ID. Usage: /remove <task_id>")
+        return
+    
+    task_id = message.command[1].strip()
+    logger.info(f"Attempting to remove task {task_id}")
+    try:
+        task = queue_collection.find_one({"task_id": task_id})
+        if not task:
+            logger.warning(f"Task ID {task_id} not found")
+            await message.reply("Task ID not found.")
+            return
+        
+        if task["user_id"] != message.from_user.id:
+            logger.warning(f"User {message.from_user.id} attempted to remove task {task_id} not owned by them")
+            await message.reply("You can only remove your own tasks.")
+            return
+        
+        if task["status"] == "encoding":
+            logger.warning(f"Cannot remove task {task_id} as it is encoding")
+            await message.reply("Cannot remove a task that is currently encoding.")
+            return
+        
+        queue_collection.delete_one({"task_id": task_id})
+        logger.info(f"Task {task_id} removed successfully")
+        await message.reply(f"Task `{task_id}` removed from queue.")
+    except Exception as e:
+        logger.error(f"Error in remove_task: {e}")
+        await message.reply("Failed to remove task. Please try again.")
+        
 @Client.on_message((filters.group | filters.private) & filters.command('set_caption'))
 async def add_caption(client, message):
 
@@ -169,48 +235,3 @@ async def see_metadata(client, message):
         await SnowDev.edit(f"✅ <b>Yᴏᴜʀ Cᴜʀʀᴇɴᴛ Mᴇᴛᴀᴅᴀᴛᴀ Cᴏᴅᴇ ɪs :-</b>\n\n<code>{metadata}</code>")
     else:
         await SnowDev.edit(f"😔 __**Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Aɴy Mᴇᴛᴀᴅᴀᴛᴀ Cᴏᴅᴇ**__")
-
-@Client.on_message(filters.command(["queue", "q"]))
-async def show_queue(client, message):
-    tasks = list(queue_collection.find().sort("added_at", 1))
-    if not tasks:
-        await message.reply("Global queue is empty.")
-        return
-    
-    response = "Global queue:\n"
-    for idx, task in enumerate(tasks, 1):
-        status = "encoding" if task["status"] == "encoding" else "in queue"
-        response += f"""
-Task no: {idx}
-Status: {status}
-File name: {task['filename']}
-File size: {humanbytes(task['file_size'])}
-User: @{task['username']}
-Task Id: {task['task_id']}
-===================
-"""
-    await message.reply(response)
-
-@Client.on_message(filters.command(["remove", "r"]))
-async def remove_task(client, message):
-    if len(message.command) < 2:
-        await message.reply("Please provide a Task ID. Usage: /remove <task_id>")
-        return
-    
-    task_id = message.command[1]
-    task = queue_collection.find_one({"task_id": task_id})
-    
-    if not task:
-        await message.reply("Task ID not found.")
-        return
-    
-    if task["user_id"] != message.from_user.id:
-        await message.reply("You can only remove your own tasks.")
-        return
-    
-    if task["status"] == "encoding":
-        await message.reply("Cannot remove a task that is currently encoding.")
-        return
-    
-    queue_collection.delete_one({"task_id": task_id})
-    await message.reply(f"Task `{task_id}` removed from queue.")
