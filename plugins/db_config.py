@@ -1,9 +1,10 @@
 from pyrogram import Client, filters, enums
 from helper.database import db
-from helper.utils import CANT_CONFIG_GROUP_MSG
+from helper.utils import CANT_CONFIG_GROUP_MSG, humanbytes
 from script import Txt
 from asyncio.exceptions import TimeoutError
-
+from pymongo import MongoClient
+from config import Config
 
 @Client.on_message((filters.group | filters.private) & filters.command('set_caption'))
 async def add_caption(client, message):
@@ -168,3 +169,48 @@ async def see_metadata(client, message):
         await SnowDev.edit(f"✅ <b>Yᴏᴜʀ Cᴜʀʀᴇɴᴛ Mᴇᴛᴀᴅᴀᴛᴀ Cᴏᴅᴇ ɪs :-</b>\n\n<code>{metadata}</code>")
     else:
         await SnowDev.edit(f"😔 __**Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Aɴy Mᴇᴛᴀᴅᴀᴛᴀ Cᴏᴅᴇ**__")
+
+@Client.on_message(filters.command(["queue", "q"]))
+async def show_queue(client, message):
+    tasks = list(queue_collection.find().sort("added_at", 1))
+    if not tasks:
+        await message.reply("Global queue is empty.")
+        return
+    
+    response = "Global queue:\n"
+    for idx, task in enumerate(tasks, 1):
+        status = "encoding" if task["status"] == "encoding" else "in queue"
+        response += f"""
+Task no: {idx}
+Status: {status}
+File name: {task['filename']}
+File size: {humanbytes(task['file_size'])}
+User: @{task['username']}
+Task Id: {task['task_id']}
+===================
+"""
+    await message.reply(response)
+
+@Client.on_message(filters.command(["remove", "r"]))
+async def remove_task(client, message):
+    if len(message.command) < 2:
+        await message.reply("Please provide a Task ID. Usage: /remove <task_id>")
+        return
+    
+    task_id = message.command[1]
+    task = queue_collection.find_one({"task_id": task_id})
+    
+    if not task:
+        await message.reply("Task ID not found.")
+        return
+    
+    if task["user_id"] != message.from_user.id:
+        await message.reply("You can only remove your own tasks.")
+        return
+    
+    if task["status"] == "encoding":
+        await message.reply("Cannot remove a task that is currently encoding.")
+        return
+    
+    queue_collection.delete_one({"task_id": task_id})
+    await message.reply(f"Task `{task_id}` removed from queue.")
