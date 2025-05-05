@@ -19,12 +19,12 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMedi
 from pymongo import MongoClient
 
 # MongoDB setup
-MONGO_URI = Config.MONGO_URI  # Add MONGO_URI to your Config
+MONGO_URI = Config.DB_URL
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client['encoding_bot']
 queue_collection = db['queue']
 
-# Global queue lock to ensure one encoding at a time
+
 ENCODING_LOCK = asyncio.Lock()
 
 async def progress_for_pyrogram(current, total, ud_type, message, start):
