@@ -1,8 +1,9 @@
 import asyncio
-import math, time
+import math
+import time
 import string
 import random
-from . import *
+import logging
 from datetime import datetime as dt
 import sys
 import shutil
@@ -15,16 +16,24 @@ from pytz import timezone
 from config import Config
 from script import Txt
 from pyrogram import enums
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pymongo import MongoClient
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # MongoDB setup
-MONGO_URI = Config.DB_URL
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client['encoding_bot']
-queue_collection = db['queue']
+try:
+    mongo_client = MongoClient(Config.MONGO_URI)
+    db = mongo_client['encoding_bot']
+    queue_collection = db['queue']
+    logger.info("MongoDB connection successful")
+except Exception as e:
+    logger.error(f"MongoDB connection failed: {e}")
+    raise Exception("Failed to connect to MongoDB. Check MONGO_URI in config.")
 
-
+# Global queue lock
 ENCODING_LOCK = asyncio.Lock()
 
 async def progress_for_pyrogram(current, total, ud_type, message, start):
@@ -131,62 +140,79 @@ async def CANT_CONFIG_GROUP_MSG(client, message):
     btn = [
         [InlineKeyboardButton(text='Bᴏᴛ Pᴍ', url=f'https://t.me/{botusername.username}')]
     ]
-    ms = await message.reply_text(text="Sᴏʀʀʏ Yᴏᴜ Cᴀɴ'ᴛ Cᴏɴғɪɢ Yᴏᴜʀ Sᴇᴛᴛɪɴɢs\n\nFɪʀsᴛ sᴛᴀʀᴛ ᴍᴇ ɪɴ ᴘʀɪᴠᴀᴛᴇ ᴛʜᴇɴ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ ᴍʏ ғᴇᴀᴛᴜʀᴇs ɪɴ ɢʀᴏᴜᴘ", reply_to_message_id = message.id, reply_markup=InlineKeyboardMarkup(btn))
+    ms = await message.reply_text(text="Sᴏʀʀʏ Yᴏᴜ Cᴀɴ'ᴛ Cᴏɴғɪɢ Yᴏᴜʀ Sᴇᴛᴛɪɴɢs\n\nFɪʀsᴛ sᴛᴀʀᴛ ᴍᴇ ɪɴ ᴘʀɪᴠᴀᴛᴇ ᴛʜᴇɴ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ ᴍʏ ғᴇᴀᴛᴜʀᴇs ɪɴ ɢʀᴏᴜᴘ", reply_to_message_id=message.id, reply_markup=InlineKeyboardMarkup(btn))
     await asyncio.sleep(10)
     await ms.delete()
 
 async def Compress_Stats(e, task_id):
-    task = queue_collection.find_one({"task_id": task_id})
-    if not task:
-        return await e.answer("Task not found.", show_alert=True)
-    
-    if int(task["user_id"]) != e.from_user.id:
-        return await e.answer(f"⚠️ Hᴇʏ {e.from_user.first_name}\nYᴏᴜ ᴄᴀɴ'ᴛ sᴇᴇ sᴛᴀᴛᴜs ᴀs ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ғɪʟᴇ", show_alert=True)
-    
-    inp = f"ffmpeg/{task['user_id']}/{task['filename']}"
-    outp = f"encode/{task['user_id']}/{task['filename']}"
+    logger.info(f"Stats requested for task {task_id} by user {e.from_user.id}")
     try:
-        ot = humanbytes(int((Path(outp).stat().st_size)))
-        ov = humanbytes(int(Path(inp).stat().st_size))
-        ans = f"Processing Media: {task['filename']}\n\nDownloaded: {ov}\n\nCompressed: {ot}"
-        await e.answer(ans, cache_time=0, show_alert=True)
-    except Exception as er:
-        print(er)
-        await e.answer("Something Went Wrong.\nSend Media Again.", cache_time=0, alert=True)
+        task = queue_collection.find_one({"task_id": task_id})
+        if not task:
+            logger.warning(f"Task {task_id} not found for stats")
+            return await e.answer("Task not found.", show_alert=True)
+        
+        if int(task["user_id"]) != e.from_user.id:
+            logger.warning(f"User {e.from_user.id} attempted to view stats for task {task_id} not owned by them")
+            return await e.answer(f"⚠️ Hᴇʏ {e.from_user.first_name}\nYᴏᴜ ᴄᴀɴ'ᴛ sᴇᴇ sᴛᴀᴛᴜs ᴀs ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ғɪʟᴇ", show_alert=True)
+        
+        inp = f"ffmpeg/{task['user_id']}/{task['filename']}"
+        outp = f"encode/{task['user_id']}/{task['filename']}"
+        try:
+            ot = humanbytes(int(Path(outp).stat().st_size))
+            ov = humanbytes(int(Path(inp).stat().st_size))
+            ans = f"Processing Media: {task['filename']}\n\nDownloaded: {ov}\n\nCompressed: {ot}"
+            await e.answer(ans, cache_time=0, show_alert=True)
+        except Exception as er:
+            logger.error(f"Error retrieving stats for task {task_id}: {er}")
+            await e.answer("Something Went Wrong.\nSend Media Again.", cache_time=0, alert=True)
+    except Exception as e:
+        logger.error(f"Error in Compress_Stats for task {task_id}: {e}")
+        await e.answer("Failed to retrieve stats.", show_alert=True)
 
 async def skip(e, task_id):
-    task = queue_collection.find_one({"task_id": task_id})
-    if not task:
-        return await e.answer("Task not found.", show_alert=True)
-    
-    if int(task["user_id"]) != e.from_user.id:
-        return await e.answer(f"⚠️ Hᴇʏ {e.from_user.first_name}\nYᴏᴜ ᴄᴀɴ'ᴛ ᴄᴀɴᴄᴇʟ ᴛʜᴇ ᴘʀᴏᴄᴇss ᴀs ʏᴏᴜ ᴅɪᴅɴ'ᴛ sᴛᴀʀᴛ ɪᴛ", show_alert=True)
-    
+    logger.info(f"Skip requested for task {task_id} by user {e.from_user.id}")
     try:
-        await e.message.delete()
-        os.system(f"rm -rf ffmpeg/{task['user_id']}/*")
-        os.system(f"rm -rf encode/{task['user_id']}/*")
-        for proc in psutil.process_iter():
-            processName = proc.name()
-            processID = proc.pid
-            if processName == "ffmpeg":
-                os.kill(processID, signal.SIGKILL)
+        task = queue_collection.find_one({"task_id": task_id})
+        if not task:
+            logger.warning(f"Task {task_id} not found for skip")
+            return await e.answer("Task not found.", show_alert=True)
+        
+        if int(task["user_id"]) != e.from_user.id:
+            logger.warning(f"User {e.from_user.id} attempted to skip task {task_id} not owned by them")
+            return await e.answer(f"⚠️ Hᴇʏ {e.from_user.first_name}\nYᴏᴜ ᴄᴀɴ'ᴛ ᴄᴀɴᴄᴇʟ ᴛʜᴇ ᴘʀᴏᴄᴇss ᴀs ʏᴏᴜ ᴅɪᴅɴ'ᴛ sᴛᴀʀᴛ ɪᴛ", show_alert=True)
+        
+        try:
+            await e.message.delete()
+            os.system(f"rm -rf ffmpeg/{task['user_id']}/*")
+            os.system(f"rm -rf encode/{task['user_id']}/*")
+            for proc in psutil.process_iter():
+                processName = proc.name()
+                processID = proc.pid
+                if processName == "ffmpeg":
+                    os.kill(processID, signal.SIGKILL)
+        except Exception as er:
+            logger.error(f"Error during cleanup for task {task_id}: {er}")
+        
+        try:
+            shutil.rmtree(f'ffmpeg/{task["user_id"]}')
+            shutil.rmtree(f'encode/{task["user_id"]}')
+            queue_collection.delete_one({"task_id": task_id})
+            logger.info(f"Task {task_id} skipped and removed from queue")
+        except Exception as er:
+            logger.error(f"Error removing directories for task {task_id}: {er}")
     except Exception as e:
-        pass
-    try:
-        shutil.rmtree(f'ffmpeg/{task["user_id"]}')
-        shutil.rmtree(f'encode/{task["user_id"]}')
-        queue_collection.delete_one({"task_id": task_id})
-    except Exception as e:
-        pass
-    return
+        logger.error(f"Error in skip for task {task_id}: {e}")
+        await e.answer("Failed to cancel task.", show_alert=True)
 
 def generate_task_id():
     return ''.join(random.choices(string.ascii_letters + string.digits + "!@#$%^&*:", k=5))
 
 async def add_to_queue(bot, query, ffmpegcode, c_thumb):
+    logger.info(f"Adding task to queue for user {query.from_user.id}")
     media = query.message.reply_to_message
     if not media or not media.media:
+        logger.error("No media found in the replied message")
         return await query.message.edit("Please reply to a media file.")
     
     file = getattr(media, media.media.value)
@@ -211,36 +237,48 @@ async def add_to_queue(bot, query, ffmpegcode, c_thumb):
         "chat_id": query.message.chat.id,
         "added_at": datetime.now()
     }
-    queue_collection.insert_one(task)
+    try:
+        queue_collection.insert_one(task)
+        logger.info(f"Task {task_id} added to queue for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to insert task {task_id} into MongoDB: {e}")
+        return await query.message.edit("Failed to add task to queue.")
+    
     await query.message.edit(f"Task added to queue with Task ID: `{task_id}`\nUse /queue to view the queue.")
     
-    # Start processing if queue was empty
-    if queue_collection.count_documents({"status": "encoding"}) == 0:
-        await process_queue(bot)
+    # Start processing if no task is encoding
+    encoding_count = queue_collection.count_documents({"status": "encoding"})
+    logger.info(f"Current encoding tasks: {encoding_count}")
+    if encoding_count == 0:
+        logger.info("No tasks encoding, starting queue processing")
+        asyncio.create_task(process_queue(bot))
 
 async def process_queue(bot):
-    async with ENCODING_LOCK:
-        while True:
+    logger.info("Starting queue processing")
+    while True:
+        async with ENCODING_LOCK:
             task = queue_collection.find_one_and_update(
                 {"status": "in_queue"},
                 {"$set": {"status": "encoding"}},
                 sort=[("added_at", 1)]
             )
             if not task:
+                logger.info("No tasks in queue, exiting process_queue")
                 break
             
+            logger.info(f"Processing task {task['task_id']} for user {task['user_id']}")
             try:
                 await process_task(bot, task)
+                logger.info(f"Task {task['task_id']} completed successfully")
             except Exception as e:
-                print(f"Error processing task {task['task_id']}: {e}")
-                queue_collection.delete_one({"task_id": task["task_id"]})
+                logger.error(f"Error processing task {task['task_id']}: {e}")
+            finally:
+                queue_collection.delete_one({"task_id": task['task_id']})
                 try:
                     shutil.rmtree(f"ffmpeg/{task['user_id']}")
                     shutil.rmtree(f"encode/{task['user_id']}")
                 except:
                     pass
-            finally:
-                queue_collection.delete_one({"task_id": task["task_id"]})
 
 async def process_task(bot, task):
     UID = task["user_id"]
@@ -248,7 +286,13 @@ async def process_task(bot, task):
     ffmpegcode = task["ffmpegcode"]
     c_thumb = task["c_thumb"]
     task_id = task["task_id"]
-    message = await bot.get_messages(task["chat_id"], task["message_id"])
+    logger.info(f"Starting download for task {task_id}")
+    
+    try:
+        message = await bot.get_messages(task["chat_id"], task["message_id"])
+    except Exception as e:
+        logger.error(f"Failed to retrieve message for task {task_id}: {e}")
+        raise Exception("Failed to retrieve message.")
     
     Download_DIR = f"ffmpeg/{UID}"
     Output_DIR = f"encode/{UID}"
@@ -271,12 +315,14 @@ async def process_task(bot, task):
             progress_args=("\n⚠️__**Please wait...**__\n☃️ **Dᴏᴡɴʟᴏᴀᴅ Sᴛᴀʀᴛᴇᴅ....**", message, time.time())
         )
     except Exception as e:
+        logger.error(f"Download failed for task {task_id}: {e}")
         await message.edit(str(e))
         raise e
     
     es = dt.now()
     dtime = ts(int((es - s).seconds) * 1000)
     
+    logger.info(f"Starting encoding for task {task_id}")
     await message.edit(
         "**🗜 Compressing...**",
         reply_markup=InlineKeyboardMarkup([
@@ -295,27 +341,35 @@ async def process_task(bot, task):
     
     try:
         if er:
+            logger.error(f"FFmpeg error for task {task_id}: {er}")
             await message.edit(str(er) + "\n\n**Error**")
             raise Exception(er)
-    except BaseException:
-        pass
+    except Exception as e:
+        raise e
     
     ees = dt.now()
     
-    if (file.thumbs or c_thumb):
+    logger.info(f"Preparing upload for task {task_id}")
+    media = message.reply_to_message
+    file = getattr(media, media.media.value)
+    if file.thumbs or c_thumb:
         if c_thumb:
             ph_path = await bot.download_media(c_thumb)
         else:
             ph_path = await bot.download_media(file.thumbs[0].file_id)
+    else:
+        ph_path = None
     
     org = int(Path(File_Path).stat().st_size)
-    com = int((Path(Output_Path).stat().st_size))
+    com = int(Path(Output_Path).stat().st_size)
     pe = 100 - ((com / org) * 100)
     per = str(f"{pe:.2f}") + "%"
     eees = dt.now()
     x = dtime
     xx = ts(int((ees - es).seconds) * 1000)
     xxx = ts(int((eees - ees).seconds) * 1000)
+    
+    logger.info(f"Starting upload for task {task_id}")
     await message.edit("⚠️__**Please wait...**__\n**Tʀyɪɴɢ Tᴏ Uᴩʟᴏᴀᴅɪɴɢ....**")
     await bot.send_document(
         UID,
@@ -328,20 +382,21 @@ async def process_task(bot, task):
     
     if message.chat.type == enums.ChatType.SUPERGROUP:
         botusername = await bot.get_me()
-        await message.edit(f"Hey {message.reply_to_message.from_user.mention},\n\nI Have Sent Compressed File To Your PM", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="Bᴏᴛ Pᴍ", url=f'https://t.me/{botusername.username}')]]))
+        await message.edit(
+            f"Hey {message.reply_to_message.from_user.mention},\n\nI Have Sent Compressed File To Your PM",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="Bᴏᴛ Pᴍ", url=f'https://t.me/{botusername.username}')]])
+        )
     else:
         await message.delete()
     
     try:
         shutil.rmtree(f"ffmpeg/{UID}")
         shutil.rmtree(f"encode/{UID}")
-        os.remove(ph_path)
+        if ph_path:
+            os.remove(ph_path)
     except:
         pass
 
 async def CompressVideo(bot, query, ffmpegcode, c_thumb):
-    async with ENCODING_LOCK:
-        if queue_collection.count_documents({"status": "encoding"}) > 0:
-            await add_to_queue(bot, query, ffmpegcode, c_thumb)
-        else:
-            await add_to_queue(bot, query, ffmpegcode, c_thumb)
+    logger.info(f"Received compress request from user {query.from_user.id}")
+    await add_to_queue(bot, query, ffmpegcode, c_thumb)
