@@ -1,6 +1,6 @@
 import asyncio
 import shutil
-import humanize
+import humanize, psutil
 from time import sleep
 from config import Config
 from script import Txt
@@ -96,3 +96,19 @@ async def cancel_process(bot:Client, message:Message):
         return await message.reply_text(text="**Canceled All On Going Processes ✅**")
     except BaseException:
         pass
+
+@Client.on_message(filters.command("dstats") & filters.private)
+async def stats_command(client, message):
+    
+    cpu_percent = psutil.cpu_percent(interval=1)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+
+    stats_message = (
+        f"**System Stats:**\n\n"
+        f"**CPU Usage:** {cpu_percent}%\n"
+        f"**RAM Usage:** {memory.used / (1024 ** 3):.2f} GB / {memory.total / (1024 ** 3):.2f} GB ({memory.percent}%)\n"
+        f"**Disk Usage:** {disk.used / (1024 ** 3):.2f} GB / {disk.total / (1024 ** 3):.2f} GB ({disk.percent}%)\n"
+    )
+
+    await message.reply_text(stats_message)
