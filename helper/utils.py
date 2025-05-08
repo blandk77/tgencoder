@@ -54,9 +54,10 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
             estimated_total_time if estimated_total_time != '' else "0 s",
             cpu_usage,
             ram_usage,
-            disk_space
-            speed
+            disk_space,
+            humanbytes(speed)
         )
+        disable_web_page_preview=True
         try:
             await message.edit(
                 text=f"{ud_type}\n\n{tmp}",               
