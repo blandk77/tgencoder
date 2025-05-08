@@ -21,6 +21,14 @@ TASK_POSITIONS = {}  # Track task positions for each user
 CURRENTLY_PROCESSING = False  # Track if encoding is in progress
 # --- END QUEUE SYSTEM ADDITIONS ---
 
+def get_system_stats():
+    cpu_usage = psutil.cpu_percent(interval=1)
+    ram = psutil.virtual_memory()
+    ram_usage = ram.percent
+    disk = psutil.disk_usage('/')
+    disk_space = f"{disk.free / (1024**3):.2f} GB"
+    return cpu_usage, ram_usage, disk_space
+    
 async def progress_for_pyrogram(current, total, ud_type, message, start):
     now = time.time()
     diff = now - start
@@ -43,7 +51,11 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
             humanbytes(current),
             humanbytes(total),
             humanbytes(speed),            
-            estimated_total_time if estimated_total_time != '' else "0 s"
+            estimated_total_time if estimated_total_time != '' else "0 s",
+            cpu_usage,
+            ram_usage,
+            disk_space
+            speed
         )
         try:
             await message.edit(
